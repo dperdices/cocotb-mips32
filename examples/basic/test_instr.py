@@ -5,8 +5,9 @@ class TestInstr(MIPS32ProcessorTest):
     asm_code = """
     addi $1, $zero, 1
     """
+    log_file = "prueba.txt"
+
     async def main(self, uut):
-        await self.init_processor(uut)
         await self.wait_cycles(1)
         assert self.regs[1] == 1
         assert self.PC == 4

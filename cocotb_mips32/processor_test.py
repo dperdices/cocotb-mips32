@@ -22,6 +22,9 @@ class MIPS32ProcessorTest(object):
     asm_code = None
     asm_file = None
     initialized = False
+    log_file = None
+    result = "tbd"
+    error = None
 
     def __init__(self) -> None:
         # If asm_file is present, read the asm code from the file
@@ -48,7 +51,7 @@ class MIPS32ProcessorTest(object):
     async def clock(self, uut):
         """Clock co-routine."""
         self.CLOCK_CYCLE = 2*(self.CLOCK_CYCLE // 2)
-        uut._log.debug(f"Starting clock (clock cycle={self.CLOCK_CYCLE}ns)")
+        self.log.debug(f"Starting clock (clock cycle={self.CLOCK_CYCLE}ns)")
         while self.clock_ticking:
             uut.Clk <= 0
             await Timer(self.CLOCK_CYCLE // 2, units="ns")
@@ -132,6 +135,7 @@ class MIPS32ProcessorTest(object):
         if self.initialized:
             return
         self.uut = uut
+        self.log = self.uut._log
         self.reset_processor(uut)
         await self.wait_cycles(1)
         uut.Reset <= 1
@@ -154,18 +158,40 @@ class MIPS32ProcessorTest(object):
                 res[int(pieces[0], base=16)] = int(pieces[1], base=16)
         return res
 
+    def log_result(self):
+        """Logs the result to the file"""
+        if self.log_file:
+            with open(self.log_file, "a") as f:
+                f.write(f"{self.__class__.__name__}\t{self.result}\n")
+
     def register_test(self):
         """Registers the test in the module."""
-        f = self.main
-        self.main.__func__.__name__ = self.__class__.__name__
-        self.main.__func__.__qualname__ = self.__class__.__name__
-        self.main.__func__.__doc__ = self.__doc__ or self.asm_code
+        async def wrapper(uut):
+            await self.init_processor(uut)
+            try:
+                await self.main(uut)
+                self.result = "correct"
+            except AssertionError as e:
+                self.result = "error"
+                self.error = e
+            except Exception as e:
+                self.result = "exec_error"
+                self.error = e
+            
+            self.log_result()
+            if self.error:
+                raise self.error
+
+        f = wrapper
+        f.__name__ = self.__class__.__name__
+        f.__qualname__ = self.__class__.__name__
+        f.__doc__ = self.__doc__ or self.asm_code
         globals()[self.__class__.__name__] = cocotb.test()(f)
         return globals()[self.__class__.__name__]
 
     async def main(self, uut):
-        uut._log.info(f"{to_int(uut.IAddr.value)}")
+        self.log.info(f"{to_int(uut.IAddr.value)}")
         await self.wait_cycles(3)
-        uut._log.info(f"{to_int(uut.IAddr.value)}")
+        self.log.info(f"{to_int(uut.IAddr.value)}")
         self.clock_ticking = False
         print("End of test")
