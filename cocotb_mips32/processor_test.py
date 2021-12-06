@@ -110,10 +110,13 @@ class MIPS32ProcessorTest(object):
             self.Regs()[i].value = random.randint(lower_limit, upper_limit)
 
     def assertRegEqual(self, reg, val):
-        assert self.regs[reg] == val, "Register {} ({}) is not equal to {}".format(reg, self.regs[reg], val)
+        assert self.regs[reg] == val, f"Register ${reg} is not equal to {val}, but ${reg}={int(self.regs[reg])}"
+
+    def assertMemEqual(self, dir, val):
+        assert self.data[dir] == val, f"Memory address ${dir} is not equal to {val}, but MEM[{dir}]={int(self.data[dir])}"
 
     def assertPCEqual(self, val):
-        assert self.PC == val, "PC ({}) is not equal to {}".format(self.PC, val)
+        assert self.PC == val, f"PC is not equal to {val}, but PC={self.PC}"
 
     def get_regs_as_dict(self, uut):
         """Returns the registers as a dictionary."""

@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-VERSION = "0.5.7" 
+VERSION = "0.5.8" 
 DESCRIPTION = "A MIPS32 testbench in Python based on cocotb"
 LONG_DESCRIPTION = "A MIPS32 testbench in Python based on cocotb"
 
