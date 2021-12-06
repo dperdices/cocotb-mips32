@@ -67,7 +67,7 @@ class MIPS32ProcessorTest(object):
                 uut.IDataIn.value = 0
             else:
                 uut.IDataIn.value = self.instructions[address]
-            await First(Edge(uut.IAddr), Timer(self.CLOCK_CYCLE, units="ns") // 4)
+            await First(Edge(uut.IAddr), Timer(self.CLOCK_CYCLE // 2, units="ns"))
 
     async def read_data_mem(self, uut):
         """Async read data memory co-routine."""
@@ -77,7 +77,7 @@ class MIPS32ProcessorTest(object):
                 uut.DDataIn.value = 0
             else:
                 uut.DDataIn.value = self.data[address]
-            await First(Edge(uut.DAddr), Timer(self.CLOCK_CYCLE, units="ns") // 4)
+            await First(Edge(uut.DAddr), Timer(self.CLOCK_CYCLE // 2, units="ns"))
 
     async def write_data_mem(self, uut):
         """Sync write data memory co-routine."""
