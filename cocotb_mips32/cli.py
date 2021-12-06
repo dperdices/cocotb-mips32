@@ -69,6 +69,8 @@ def main():
             }
             print(env["LM_LICENSE_FILE"])
             env["PATH"] = f"{env['PATH']}:/opt/questasim/linux_x86_64"
+            env["TMPDIR"] = "/tmp/"
+            print(f"Running {cmd} in container")
             container = client.containers.run(docker_image, command=cmd, stdout=True, volumes=vols, stderr=True, 
                             auto_remove=False, environment=env, detach=True, stdin_open=True, 
                             cap_add=["SYS_PTRACE"], security_opt=["seccomp=unconfined"])
@@ -82,10 +84,10 @@ def main():
                 },
             )
             input_socket._sock.sendall(do_script.encode("utf8"))
-            input_socket._sock.close()
             container.stop()
             container.wait()
             print(container.logs().decode("utf8"))
+            print(container.logs(stdout=True).decode("utf8"))
             container.remove()
             
         else:
