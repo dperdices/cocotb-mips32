@@ -68,7 +68,10 @@ def main():
                 }
             }
             print(env["LM_LICENSE_FILE"])
-            container = client.containers.run(docker_image, command=cmd, stdout=True, volumes=vols, stderr=True, auto_remove=False, environment=env, detach=True, stdin_open=True)
+            env["PATH"] = f"{env['PATH']}:/opt/questasim/linux_x86_64"
+            container = client.containers.run(docker_image, command=cmd, stdout=True, volumes=vols, stderr=True, 
+                            auto_remove=False, environment=env, detach=True, stdin_open=True, 
+                            cap_add=["SYS_PTRACE"], security_opt=["seccomp=unconfined"])
             # Writing to stdin
             input_socket = container.attach_socket(
                 params={
@@ -82,10 +85,7 @@ def main():
             input_socket._sock.close()
             container.stop()
             container.wait()
-
-            print(input_socket, dir(input_socket))
             print(container.logs().decode("utf8"))
-            
             container.remove()
             
         else:

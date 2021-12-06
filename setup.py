@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-VERSION = "0.5.1" 
+VERSION = "0.5.4" 
 DESCRIPTION = "A MIPS32 testbench in Python based on cocotb"
 LONG_DESCRIPTION = "A MIPS32 testbench in Python based on cocotb"
 
@@ -15,6 +15,6 @@ setup(
         entry_points = {
             "console_scripts": ["cocotb-mips32 = cocotb_mips32.cli:main"],
         },
-        install_requires=["cocotb"], # add any additional packages that 
+        install_requires=["cocotb", "docker"], # add any additional packages that 
         
 )

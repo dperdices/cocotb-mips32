@@ -25,7 +25,7 @@ class MIPS32ProcessorTest(object):
     log_file = None
     result = "tbd"
     error = None
-
+    t = 0
     def __init__(self) -> None:
         # If asm_file is present, read the asm code from the file
         if self.asm_file:
@@ -53,19 +53,20 @@ class MIPS32ProcessorTest(object):
         self.CLOCK_CYCLE = 2*(self.CLOCK_CYCLE // 2)
         self.log.debug(f"Starting clock (clock cycle={self.CLOCK_CYCLE}ns)")
         while self.clock_ticking:
-            uut.Clk <= 0
+            uut.Clk.value = 0
             await Timer(self.CLOCK_CYCLE // 2, units="ns")
-            uut.Clk <= 1
+            uut.Clk.value = 1
             await Timer(self.CLOCK_CYCLE // 2, units="ns")
+            self.t += 1
 
     async def read_inst_mem(self, uut):
         """Async read instruction memory co-routine."""
         while self.clock_ticking:
             address = to_int(uut.IAddr.value)
             if address not in self.instructions:
-                uut.IDataIn <= 0
+                uut.IDataIn.value = 0
             else:
-                uut.IDataIn <= self.instructions[address]
+                uut.IDataIn.value = self.instructions[address]
             await First(Edge(uut.IAddr), Timer(self.CLOCK_CYCLE, units="ns"))
 
     async def read_data_mem(self, uut):
@@ -73,9 +74,9 @@ class MIPS32ProcessorTest(object):
         while self.clock_ticking:
             address = to_int(uut.DAddr.value)
             if address not in self.data:
-                uut.DDataIn <= 0
+                uut.DDataIn.value = 0
             else:
-                uut.DDataIn <= self.data[address]
+                uut.DDataIn.value = self.data[address]
             await First(Edge(uut.DAddr), Timer(self.CLOCK_CYCLE, units="ns"))
 
     async def write_data_mem(self, uut):
@@ -106,7 +107,13 @@ class MIPS32ProcessorTest(object):
     def randomized_regs(self, uut, lower_limit=1, upper_limit=2**31-1):
         """Sets a randomized register set."""
         for i in range(1, 32):
-            self.Regs()[i] <= random.randint(lower_limit, upper_limit)
+            self.Regs()[i].value = random.randint(lower_limit, upper_limit)
+
+    def assertRegEqual(self, reg, val):
+        assert self.regs[reg] == val, "Register {} ({}) is not equal to {}".format(reg, self.regs[reg], val)
+
+    def assertPCEqual(self, val):
+        assert self.PC == val, "PC ({}) is not equal to {}".format(self.PC, val)
 
     def get_regs_as_dict(self, uut):
         """Returns the registers as a dictionary."""
@@ -125,10 +132,10 @@ class MIPS32ProcessorTest(object):
 
     def reset_processor(self, uut):
         """Resets the processor."""
-        uut.Reset <= 1
-        uut.IDataIn <= 0
-        uut.DDataIn <= 0
-        uut.Clk <= 0
+        uut.Reset.value = 1
+        uut.IDataIn.value = 0
+        uut.DDataIn.value = 0
+        uut.Clk.value = 0
 
     async def init_processor(self, uut):
         """Initializes the processor."""
@@ -138,13 +145,14 @@ class MIPS32ProcessorTest(object):
         self.log = self.uut._log
         self.reset_processor(uut)
         await self.wait_cycles(1)
-        uut.Reset <= 1
+        uut.Reset.value = 1
         cocotb.fork(self.clock(uut))
         cocotb.fork(self.read_data_mem(uut))
         cocotb.fork(self.read_inst_mem(uut))
         cocotb.fork(self.write_data_mem(uut))
         await self.wait_cycles(3)
-        uut.Reset <= 0
+        self.t = 0
+        uut.Reset.value = 0
         self.initialized = True
 
     def memload_from_str(self, str):
