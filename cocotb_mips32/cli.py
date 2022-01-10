@@ -84,10 +84,12 @@ def main():
                 },
             )
             input_socket._sock.sendall(do_script.encode("utf8"))
-            container.stop()
-            container.wait()
+            try:
+                container.wait(timeout=20)
+            except:
+                pass
             print(container.logs().decode("utf8"))
-            print(container.logs(stdout=True).decode("utf8"))
+            container.stop()
             container.remove()
             
         else:

@@ -3,6 +3,7 @@ from cocotb.triggers import Timer, Edge, First, RisingEdge
 import cocotb
 import random
 from cocotb_mips32.utils.compiling import compile_program
+import json 
 
 def to_int(a, default=0):
     """Converts a value to an integer."""
@@ -26,6 +27,7 @@ class MIPS32ProcessorTest(object):
     result = "tbd"
     error = None
     t = 0
+    state = []
     def __init__(self) -> None:
         # If asm_file is present, read the asm code from the file
         if self.asm_file:
@@ -55,9 +57,21 @@ class MIPS32ProcessorTest(object):
         while self.clock_ticking:
             uut.Clk.value = 0
             await Timer(self.CLOCK_CYCLE // 2, units="ns")
+            if self.initialized:
+                self.saveState()
             uut.Clk.value = 1
             await Timer(self.CLOCK_CYCLE // 2, units="ns")
+            if self.initialized:
+                self.saveState()
             self.t += 1
+
+    def saveState(self):
+        self.state.append({
+            "clk": self.uut.Clk.value,
+            "t": self.t,
+            "PC": self.PC,
+            "regs": self.Regs
+        })
 
     async def read_inst_mem(self, uut):
         """Async read instruction memory co-routine."""
@@ -113,10 +127,11 @@ class MIPS32ProcessorTest(object):
         assert self.regs[reg] == val, f"Register ${reg} is not equal to {val}, but ${reg}={int(self.regs[reg])}"
 
     def assertMemEqual(self, dir, val):
-        assert self.data[dir] == val, f"Memory address ${dir} is not equal to {val}, but MEM[{dir}]={int(self.data[dir])}"
+        true_val = self.data[dir] if dir in self.data else 0
+        assert (true_val == val), f"Memory address ${dir} is not equal to {val}, but MEM[{dir}]={int(true_val)}"
 
     def assertPCEqual(self, val):
-        assert self.PC == val, f"PC is not equal to {val}, but PC={self.PC}"
+        assert self.PC == val, f"PC is not equal to {val}, but PC={int(self.PC)}"
 
     def get_regs_as_dict(self, uut):
         """Returns the registers as a dictionary."""
@@ -155,6 +170,7 @@ class MIPS32ProcessorTest(object):
         cocotb.fork(self.write_data_mem(uut))
         await self.wait_cycles(3)
         self.t = 0
+        self.state = []
         uut.Reset.value = 0
         self.initialized = True
 
@@ -189,6 +205,24 @@ class MIPS32ProcessorTest(object):
                 self.result = "exec_error"
                 self.error = e
             
+            if "cocotb_result" not in globals():
+                globals["cocotb_result"] = {
+                    "results": []
+                }
+            
+            globals["cocotb_result"]["result"].append({
+                "name": self.__class__.__name__,
+                "asm": self.asm_code,
+                "data": self.data,
+                "instructions": self.instructions,
+                "data_text": self.data_text,
+                "instructions_text": self.instructions_text,
+                "state": self.state,
+                "result": self.result
+            })
+
+            with open("results.json", "w") as f:
+                f.write(json.dumps(globals["cocotb_result"]))
             self.log_result()
             if self.error:
                 raise self.error
