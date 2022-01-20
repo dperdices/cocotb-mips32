@@ -4,6 +4,7 @@ import cocotb
 import random
 from cocotb_mips32.utils.compiling import compile_program
 import json 
+import os
 
 def to_int(a, default=0):
     """Converts a value to an integer."""
@@ -29,6 +30,7 @@ class MIPS32ProcessorTest(object):
     t = 0
     state = []
     def __init__(self) -> None:
+        """Initializes the test environment."""
         # If asm_file is present, read the asm code from the file
         if self.asm_file:
             with open(self.asm_file, "r") as f:
@@ -66,11 +68,17 @@ class MIPS32ProcessorTest(object):
             self.t += 1
 
     def saveState(self):
+        """Saves the current state of the processor."""
+        regs = [None]*32
+        for i in range(32):
+            regs[i] = int(self.regs[i].value)
+
         self.state.append({
-            "clk": self.uut.Clk.value,
+            "clk": int(self.uut.Clk.value),
             "t": self.t,
-            "PC": self.PC,
-            "regs": self.Regs
+            "PC": int(self.PC),
+            "regs": regs,
+            "data": self.data
         })
 
     async def read_inst_mem(self, uut):
@@ -121,7 +129,7 @@ class MIPS32ProcessorTest(object):
     def randomized_regs(self, uut, lower_limit=1, upper_limit=2**31-1):
         """Sets a randomized register set."""
         for i in range(1, 32):
-            self.Regs()[i].value = random.randint(lower_limit, upper_limit)
+            self.regs[i].value = random.randint(lower_limit, upper_limit)
 
     def assertRegEqual(self, reg, val):
         assert self.regs[reg] == val, f"Register ${reg} is not equal to {val}, but ${reg}={int(self.regs[reg])}"
@@ -185,12 +193,6 @@ class MIPS32ProcessorTest(object):
                 res[int(pieces[0], base=16)] = int(pieces[1], base=16)
         return res
 
-    def log_result(self):
-        """Logs the result to the file"""
-        if self.log_file:
-            with open(self.log_file, "a") as f:
-                f.write(f"{self.__class__.__name__}\t{self.result}\n")
-
     def register_test(self):
         """Registers the test in the module."""
         async def wrapper(uut):
@@ -206,11 +208,10 @@ class MIPS32ProcessorTest(object):
                 self.error = e
             
             if "cocotb_result" not in globals():
-                globals["cocotb_result"] = {
-                    "results": []
+                globals()["cocotb_result"] = {
+                    "tests": []
                 }
-            
-            globals["cocotb_result"]["result"].append({
+            d = {
                 "name": self.__class__.__name__,
                 "asm": self.asm_code,
                 "data": self.data,
@@ -219,11 +220,17 @@ class MIPS32ProcessorTest(object):
                 "instructions_text": self.instructions_text,
                 "state": self.state,
                 "result": self.result
-            })
+            }
+            if self.error:
+                d["error"] = str(self.error)
 
-            with open("results.json", "w") as f:
-                f.write(json.dumps(globals["cocotb_result"]))
-            self.log_result()
+            globals()["cocotb_result"]["tests"].append(d)
+            
+            try:
+                with open("./result.json", "w") as f:
+                    f.write(json.dumps(globals()["cocotb_result"]))
+            except Exception as e:
+                print(f"Could not write result to file result.json:", e)
             if self.error:
                 raise self.error
 
@@ -235,8 +242,4 @@ class MIPS32ProcessorTest(object):
         return globals()[self.__class__.__name__]
 
     async def main(self, uut):
-        self.log.info(f"{to_int(uut.IAddr.value)}")
-        await self.wait_cycles(3)
-        self.log.info(f"{to_int(uut.IAddr.value)}")
-        self.clock_ticking = False
         print("End of test")
